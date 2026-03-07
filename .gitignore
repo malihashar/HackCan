@@ -5,3 +5,12 @@ __pycache__/
 dist/
 build/
 .next/
+.claude
+plans
+.opencode
+.idea
+AGENTS.md
+CLAUDE.md
+release-manifest.json
+.repomixignore
+figma/
