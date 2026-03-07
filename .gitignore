@@ -14,3 +14,7 @@ CLAUDE.md
 release-manifest.json
 .repomixignore
 figma/
+
+*.md
+*/collections/
+Backend/.coverage

@@ -16,13 +16,19 @@ from shared.constants import SESSION_ID_PREFIX  # noqa: E402
 _sessions: dict[str, CallSession] = {}
 
 
-def create_session(receiver_language: str = "en") -> CallSession:
+def create_session(
+    receiver_language: str = "en",
+    status: SessionStatus = SessionStatus.ACTIVE,
+    caller_language: str | None = None,
+    caller_number: str | None = None,
+) -> CallSession:
     """Create a new call session and return it."""
     session_id = f"{SESSION_ID_PREFIX}{uuid.uuid4().hex[:12]}"
     session = CallSession(
         id=session_id,
-        status=SessionStatus.ACTIVE,
-        caller_language=None,
+        status=status,
+        caller_language=caller_language,
+        caller_number=caller_number,
         receiver_language=receiver_language,
         messages=[],
     )

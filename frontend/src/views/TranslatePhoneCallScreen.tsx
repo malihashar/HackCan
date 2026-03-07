@@ -1,34 +1,33 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
 import { Phone, Mic, Languages, PhoneOff, PhoneIncoming } from "lucide-react";
 import Link from "next/link";
 import { EmptyCallState } from "@/components/call/EmptyCallState";
 import { IncomingCallState } from "@/components/call/IncomingCallState";
 import { CallDurationDisplay } from "@/components/call/CallDurationDisplay";
-
-type CallState = "idle" | "ringing" | "connecting" | "connected" | "ended";
+import { useCallWebSocket } from "@/hooks/use-call-websocket";
 
 /**
  * PhoneCallScreen - Translate phone call screen with idle/ringing/active states.
  * Blue gradient, language detection badge, voice response button.
  */
 export function PhoneCallScreen() {
-  const searchParams = useSearchParams();
-  const startActive = searchParams.get("active") === "true";
-  const [callState, setCallState] = useState<CallState>(startActive ? "connected" : "idle");
+  const {
+    callState, callerNumber, callerLanguage,
+    simulateIncomingCall, acceptCall, declineCall, endCall,
+  } = useCallWebSocket();
   const [isRecording, setIsRecording] = useState(false);
   const [durationSeconds, setDurationSeconds] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const incomingNumber = "+1 (555) 123-4567";
-  const detectedLanguage = "Spanish";
+  const displayNumber = callerNumber ?? "Unknown";
+  const displayLanguage = callerLanguage ?? "Unknown";
 
   // Duration timer: runs while call is connected
   useEffect(() => {
     if (callState === "connected") {
+      setDurationSeconds(0);
       timerRef.current = setInterval(() => {
         setDurationSeconds((prev) => prev + 1);
       }, 1000);
@@ -42,36 +41,14 @@ export function PhoneCallScreen() {
     };
   }, [callState]);
 
-  // Cleanup timeouts on unmount
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, []);
-
-  const handleAcceptCall = useCallback(() => {
-    setCallState("connecting");
-    setDurationSeconds(0);
-    timeoutRef.current = setTimeout(() => setCallState("connected"), 1500);
-  }, []);
-
-  const handleDeclineCall = useCallback(() => {
-    setCallState("idle");
-  }, []);
-
-  const handleEndCall = useCallback(() => {
-    setCallState("ended");
+  const handleEndCall = () => {
     setIsRecording(false);
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    timeoutRef.current = setTimeout(() => setCallState("idle"), 2000);
-  }, []);
-
-  const handleSimulateCall = useCallback(() => {
-    setCallState("ringing");
-  }, []);
+    endCall();
+  };
 
   const handleVoiceResponse = () => {
     setIsRecording(!isRecording);
@@ -82,7 +59,7 @@ export function PhoneCallScreen() {
     return (
       <EmptyCallState>
         <button
-          onClick={handleSimulateCall}
+          onClick={() => simulateIncomingCall("+1 (555) 123-4567", "es")}
           className="mt-6 flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-blue-500 hover:bg-blue-600 text-white shadow-lg transition-colors cursor-pointer"
         >
           <PhoneIncoming className="size-5" />
@@ -96,10 +73,10 @@ export function PhoneCallScreen() {
   if (callState === "ringing") {
     return (
       <IncomingCallState
-        phoneNumber={incomingNumber}
-        onAccept={handleAcceptCall}
-        onDecline={handleDeclineCall}
-        detectedLanguage={detectedLanguage}
+        phoneNumber={displayNumber}
+        onAccept={acceptCall}
+        onDecline={declineCall}
+        detectedLanguage={displayLanguage}
       />
     );
   }
@@ -128,7 +105,7 @@ export function PhoneCallScreen() {
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 mb-4">
           <div className="text-center">
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">Connected with</p>
-            <p className="text-3xl tracking-wide text-gray-900 dark:text-gray-100">{incomingNumber}</p>
+            <p className="text-3xl tracking-wide text-gray-900 dark:text-gray-100">{displayNumber}</p>
           </div>
         </div>
 
@@ -140,7 +117,7 @@ export function PhoneCallScreen() {
             </div>
             <div className="flex-1">
               <p className="text-sm text-amber-900 dark:text-amber-200">Foreign Language Detected</p>
-              <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">{detectedLanguage} identified</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">{displayLanguage} identified</p>
             </div>
           </div>
         </div>

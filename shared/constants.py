@@ -12,6 +12,10 @@ SESSION_ID_PREFIX = "cs_"
 WS_MSG_TRANSCRIPT_UPDATE = "transcript_update"
 WS_MSG_SESSION_STATUS = "session_status"
 WS_MSG_ERROR = "error"
+WS_MSG_INCOMING_CALL = "incoming_call"
+WS_MSG_CALL_ACCEPTED = "call_accepted"
+WS_MSG_CALL_DECLINED = "call_declined"
+WS_MSG_CALL_ENDED = "call_ended"
 
 # API paths (for reference; actual routes in backend)
 API_PROCESS_AUDIO = "/process-audio"
