@@ -16,7 +16,7 @@ export function Topbar({ actions }: TopbarProps) {
     <div className="w-full bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4">
       <div className="flex items-center justify-between max-w-7xl mx-auto">
         <Link
-          href="/"
+          href="/NormalCall"
           className="flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
         >
           <Home className="size-5" />
