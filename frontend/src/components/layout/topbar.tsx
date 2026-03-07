@@ -1,10 +1,15 @@
 "use client";
 
-import { Home, User, Sun, Moon } from "lucide-react";
+import { Home, Sun, Moon } from "lucide-react";
 import { useTheme } from "@/context/theme-context";
 import Link from "next/link";
 
-export function Topbar() {
+interface TopbarProps {
+  /** Server-rendered slot for auth controls (e.g. AuthButton) */
+  actions?: React.ReactNode;
+}
+
+export function Topbar({ actions }: TopbarProps) {
   const { theme, toggleTheme } = useTheme();
 
   return (
@@ -30,9 +35,7 @@ export function Topbar() {
             )}
           </button>
 
-          <button className="flex items-center justify-center size-10 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-            <User className="size-5 text-gray-700 dark:text-gray-300" />
-          </button>
+          {actions}
         </div>
       </div>
     </div>
