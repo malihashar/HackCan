@@ -4,7 +4,7 @@
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-import type { SessionStatus } from "@/state/callStore";
+export type SessionStatus = "waiting" | "active" | "ended";
 
 export type SessionState = {
   id: string;
