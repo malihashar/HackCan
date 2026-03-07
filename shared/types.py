@@ -11,6 +11,7 @@ from typing import Optional
 
 class SessionStatus(str, Enum):
     IDLE = "idle"
+    RINGING = "ringing"
     ACTIVE = "active"
     ENDED = "ended"
 
@@ -39,6 +40,7 @@ class CallSession:
     id: str
     status: SessionStatus
     caller_language: Optional[str] = None
+    caller_number: Optional[str] = None
     receiver_language: str = "en"
     messages: list[TranscriptMessage] = field(default_factory=list)
     created_at: Optional[str] = None

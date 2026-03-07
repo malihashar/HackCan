@@ -4,7 +4,7 @@
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-export type SessionStatus = "waiting" | "active" | "ended";
+export type SessionStatus = "idle" | "ringing" | "active" | "ended";
 
 export type SessionState = {
   id: string;
@@ -66,6 +66,39 @@ export async function translateResponse(sessionId: string, englishText: string):
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ session_id: sessionId, english_text: englishText }),
   });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// --- Call lifecycle endpoints ---
+
+export async function initiateCall(callerNumber: string, callerLanguage?: string): Promise<{
+  session_id: string;
+  status: string;
+}> {
+  const res = await fetch(`${API_BASE}/call/initiate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ caller_number: callerNumber, caller_language: callerLanguage }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function acceptCall(sessionId: string): Promise<{ session_id: string; status: string }> {
+  const res = await fetch(`${API_BASE}/call/${sessionId}/accept`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function declineCall(sessionId: string): Promise<{ session_id: string; status: string }> {
+  const res = await fetch(`${API_BASE}/call/${sessionId}/decline`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function endCall(sessionId: string): Promise<{ session_id: string; status: string }> {
+  const res = await fetch(`${API_BASE}/call/${sessionId}/end`, { method: "POST" });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

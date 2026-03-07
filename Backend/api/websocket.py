@@ -2,6 +2,7 @@
 WebSocket handler for real-time transcript updates.
 Owned by: Backend API Lead.
 """
+import asyncio
 import json
 from typing import Dict, Set
 from fastapi import WebSocket
@@ -18,15 +19,44 @@ if str(_ROOT) not in sys.path:
 from pipeline.message_router import register_transcript_listener, unregister_transcript_listener  # noqa: E402
 from shared.constants import WS_MSG_TRANSCRIPT_UPDATE, WS_MSG_SESSION_STATUS, WS_MSG_ERROR  # noqa: E402
 
+# All connected WebSocket clients (for global broadcasts like incoming_call)
+_connections: Set[WebSocket] = set()
+
 # Session id -> set of WebSocket connections subscribed to that session
 _subscriptions: Dict[str, Set[WebSocket]] = {}
 
 
 def _broadcast(session_id: str, payload: dict) -> None:
-    """Send payload to all clients subscribed to session_id."""
+    """Send payload to all clients subscribed to session_id (called from sync context)."""
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(broadcast_to_session(session_id, payload))
+        else:
+            loop.run_until_complete(broadcast_to_session(session_id, payload))
+    except RuntimeError:
+        pass
+
+
+async def broadcast_all(payload: dict, auto_subscribe_session: str | None = None) -> None:
+    """Send payload to every connected WebSocket client.
+    If auto_subscribe_session is set, subscribe all clients to that session
+    so they receive subsequent session-scoped broadcasts (accept/decline/end).
+    """
+    for ws in _connections.copy():
+        try:
+            await ws.send_json(payload)
+            if auto_subscribe_session:
+                _subscriptions.setdefault(auto_subscribe_session, set()).add(ws)
+        except Exception:
+            pass
+
+
+async def broadcast_to_session(session_id: str, payload: dict) -> None:
+    """Send payload to all clients subscribed to a specific session."""
     for ws in _subscriptions.get(session_id, set()).copy():
         try:
-            ws.send_json(payload)
+            await ws.send_json(payload)
         except Exception:
             pass
 
@@ -42,6 +72,7 @@ register_transcript_listener(_on_transcript)
 async def websocket_endpoint(websocket: WebSocket) -> None:
     """Handle WebSocket connection. Client sends { 'action': 'subscribe', 'session_id': '...' }."""
     await websocket.accept()
+    _connections.add(websocket)
     current_session: str | None = None
 
     try:
@@ -66,5 +97,6 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     except Exception:
         pass
     finally:
+        _connections.discard(websocket)
         if current_session:
             _subscriptions.get(current_session, set()).discard(websocket)

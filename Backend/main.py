@@ -26,6 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import router as api_router
 from api.websocket import websocket_endpoint
+from api.call_routes import call_router
 
 app = FastAPI(
     title="Multilingual Call Relay API",
@@ -39,6 +40,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(api_router, tags=["api"])
+app.include_router(call_router)
 app.websocket("/ws")(websocket_endpoint)
 
 
