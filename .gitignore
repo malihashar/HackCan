@@ -16,3 +16,5 @@ release-manifest.json
 figma/
 
 *.md
+*/collections/
+Backend/.coverage
