@@ -4,14 +4,16 @@
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+import type { SessionStatus } from "@/state/callStore";
+
 export type SessionState = {
   id: string;
-  status: string;
+  status: SessionStatus;
   caller_language: string | null;
   receiver_language: string;
   messages: Array<{
     id: string;
-    sender: string;
+    sender: "caller" | "agent" | "receiver";
     original_text: string;
     translated_text: string | null;
     language_code: string | null;

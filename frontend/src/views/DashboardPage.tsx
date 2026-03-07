@@ -18,7 +18,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     const unsub = callStore.subscribe(() => setState(callStore.getState()));
-    return unsub;
+    return () => { unsub(); };
   }, []);
 
   async function startCall() {

@@ -16,7 +16,7 @@ export function CallInterface() {
 
   useEffect(() => {
     const unsub = callStore.subscribe(() => setState(getState()));
-    return unsub;
+    return () => { unsub(); };
   }, []);
 
   const view = state.view;

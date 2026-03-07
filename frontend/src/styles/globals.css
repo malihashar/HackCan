@@ -1,41 +1,31 @@
-:root {
-  --bg-primary: #0f1419;
-  --bg-secondary: #1a2332;
-  --bg-tertiary: #243044;
-  --text-primary: #e7e9ea;
-  --text-muted: #8b98a5;
-  --accent: #1d9bf0;
-  --accent-hover: #1a8cd8;
-  --success: #00ba7c;
-  --warning: #ffad1f;
-  --error: #f4212e;
-  --radius: 12px;
-  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-bg-primary: #eff6ff;
+  --color-bg-card: #ffffff;
+  --color-text-primary: #1e293b;
+  --color-text-muted: #64748b;
+  --color-accent-green: #22c55e;
+  --color-accent-green-light: #dcfce7;
+  --color-accent-red: #ef4444;
+  --color-accent-red-hover: #dc2626;
+  --color-accent-blue: #2563eb;
+  --color-accent-blue-light: #dbeafe;
+  --color-accent-amber: #f59e0b;
+  --color-border: #e2e8f0;
+  --font-sans: "Inter", system-ui, sans-serif;
 }
 
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-}
+
 
 html,
 body {
   max-width: 100vw;
   min-height: 100vh;
-  background: var(--bg-primary);
-  color: var(--text-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
-}
-
-a {
-  color: var(--accent);
-  text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
 }
 
 button {
