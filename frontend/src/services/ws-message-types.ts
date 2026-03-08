@@ -6,3 +6,4 @@ export const WS_MSG_INCOMING_CALL = "incoming_call";
 export const WS_MSG_CALL_ACCEPTED = "call_accepted";
 export const WS_MSG_CALL_DECLINED = "call_declined";
 export const WS_MSG_CALL_ENDED = "call_ended";
+export const WS_MSG_TRANSLATION_UPDATE = "translation_update";

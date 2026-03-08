@@ -7,7 +7,9 @@ import { EmptyCallState } from "@/components/call/EmptyCallState";
 import { IncomingCallState } from "@/components/call/IncomingCallState";
 import { VoiceWaveAnimation } from "@/components/call/voice-wave-animation";
 import { CallDurationDisplay } from "@/components/call/CallDurationDisplay";
+import { TranslationTextDisplay } from "@/components/call/translation-text-display";
 import { useCallWebSocket } from "@/hooks/use-call-websocket";
+import { useTwilioDevice } from "@/hooks/use-twilio-device";
 
 /**
  * PhoneCallScreen - Translate phone call screen with idle/ringing/active states.
@@ -15,10 +17,10 @@ import { useCallWebSocket } from "@/hooks/use-call-websocket";
  */
 export function PhoneCallScreen() {
   const {
-    callState, callerNumber, callerLanguage,
+    callState, callerNumber, callerLanguage, translations,
     simulateIncomingCall, acceptCall, declineCall, endCall,
   } = useCallWebSocket();
-  const [isRecording, setIsRecording] = useState(false);
+  const { deviceStatus, isMuted, connectToCall, disconnect, toggleMute } = useTwilioDevice();
   const [durationSeconds, setDurationSeconds] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -42,17 +44,22 @@ export function PhoneCallScreen() {
     };
   }, [callState]);
 
+  const handleAccept = async () => {
+    await acceptCall();
+    await connectToCall();
+  };
+
   const handleEndCall = () => {
-    setIsRecording(false);
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+    disconnect();
     endCall();
   };
 
   const handleVoiceResponse = () => {
-    setIsRecording(!isRecording);
+    toggleMute();
   };
 
   // Idle state
@@ -75,7 +82,7 @@ export function PhoneCallScreen() {
     return (
       <IncomingCallState
         phoneNumber={displayNumber}
-        onAccept={acceptCall}
+        onAccept={handleAccept}
         onDecline={declineCall}
         detectedLanguage={displayLanguage}
       />
@@ -123,24 +130,47 @@ export function PhoneCallScreen() {
           </div>
         </div>
 
+        {/* Audio Status Badge */}
+        {callState === "connected" && deviceStatus !== "idle" && (
+          <div className="flex items-center justify-center mb-4">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+              deviceStatus === "on-call"
+                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                : deviceStatus === "connecting"
+                ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                : deviceStatus === "error"
+                ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+            }`}>
+              <span className={`size-1.5 rounded-full ${
+                deviceStatus === "on-call" ? "bg-green-500" : deviceStatus === "connecting" ? "bg-yellow-500 animate-pulse" : deviceStatus === "error" ? "bg-red-500" : "bg-gray-400"
+              }`} />
+              Audio: {deviceStatus === "on-call" ? "Connected" : deviceStatus === "connecting" ? "Connecting" : deviceStatus === "error" ? "Error" : "Ready"}
+            </span>
+          </div>
+        )}
+
+        {/* Live Translation */}
+        <TranslationTextDisplay translations={translations} />
+
         {/* Voice Response + End Call */}
         <div className="flex flex-col gap-4">
           <button
             onClick={handleVoiceResponse}
             disabled={callState !== "connected"}
             className={`flex items-center justify-center gap-3 py-6 rounded-2xl transition-all ${
-              isRecording
+              !isMuted
                 ? "bg-red-500 hover:bg-red-600"
                 : "bg-green-500 hover:bg-green-600"
             } text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed`}
           >
-            {isRecording ? (
+            {!isMuted ? (
               <VoiceWaveAnimation />
             ) : (
               <Mic className="size-6" />
             )}
             <span className="text-lg">
-              {isRecording ? "Recording..." : "Respond with Voice"}
+              {!isMuted ? "Speaking..." : "Push to Talk"}
             </span>
           </button>
 

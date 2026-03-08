@@ -25,8 +25,10 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from twilio.jwt.access_token import AccessToken
+from twilio.jwt.access_token.grants import VoiceGrant
 from api.routes import router as api_router
-from api.websocket import websocket_endpoint
+from api.websocket import websocket_endpoint, broadcast_all
 from twilio.twiml.voice_response import VoiceResponse, Dial
 from api.call_routes import call_router
 
@@ -64,6 +66,10 @@ import os
 
 _TWILIO_SID = os.getenv("TWILIO_SID")
 _TWILIO_AUTH = os.getenv("TWILIO_AUTH")
+TWILIO_API_KEY = os.getenv("TWILIO_API_KEY")
+TWILIO_API_SECRET = os.getenv("TWILIO_API_SECRET")
+TWIML_APP_SID = os.getenv("TWILIO_TWIML_APP_SID")
+NGROK_BASE_URL = os.getenv("NGROK_BASE_URL", "")
 
 if _TWILIO_SID and _TWILIO_AUTH:
     client = Client(_TWILIO_SID, _TWILIO_AUTH)
@@ -72,27 +78,67 @@ else:
     print("WARNING: TWILIO_SID or TWILIO_AUTH not found. Twilio Call placement will fail.")
 
 # YOUR PHONE NUMBERS
-TORONTO_BIZ_NUMBER = "+14375253147"  # The one clients call
-AI_AGENT_ID_NUMBER = "+18677960919"  # The non-Toronto one you bought for the agent
-ELEVENLABS_PHONE_GATEWAY = "+18677960919" # The number ElevenLabs gave your ag  ent
+TORONTO_BIZ_NUMBER = "+14314469290"  # The one clients call
+AI_AGENT_ID_NUMBER = "+12494446915"  # The non-Toronto one you bought for the agent
+ELEVENLABS_PHONE_GATEWAY = "+12494446915" # The number ElevenLabs gave your agent
+
+from pipeline.call_session import create_session
+from shared.types import SessionStatus
+from shared.constants import WS_MSG_INCOMING_CALL
+
+# Track whether AI agent has already been invited to the conference
+_agent_invited = False
+
+
+@app.get("/token")
+async def get_twilio_token(identity: str = "agent_browser"):
+    """Generate a Twilio Access Token for the browser Voice SDK."""
+    if not all([TWILIO_API_KEY, TWILIO_API_SECRET, TWIML_APP_SID, _TWILIO_SID]):
+        raise HTTPException(status_code=500, detail="Twilio API Key/Secret/TwiML App SID not configured")
+    token = AccessToken(
+        _TWILIO_SID, TWILIO_API_KEY, TWILIO_API_SECRET, identity=identity
+    )
+    voice_grant = VoiceGrant(
+        outgoing_application_sid=TWIML_APP_SID,
+        incoming_allow=True,
+    )
+    token.add_grant(voice_grant)
+    return {"token": token.to_jwt()}
+
 
 @app.get("/voice")
 async def handle_incoming_call(request: Request):
-    # 1. Put the human caller into the conference IMMEDIATELY
+    caller_number = request.query_params.get("From", "Unknown")
+
+    # Create RINGING session and broadcast to frontend
+    session = create_session(
+        status=SessionStatus.RINGING,
+        caller_number=caller_number,
+    )
+    await broadcast_all(
+        {
+            "type": WS_MSG_INCOMING_CALL,
+            "session_id": session.id,
+            "caller_number": caller_number,
+        },
+        auto_subscribe_session=session.id,
+    )
+
+    # Put the human caller into the conference
     response = VoiceResponse()
     dial = Dial()
-    # Use a unique but consistent name
     dial.conference('LinguisticLifeLine', start_conference_on_enter=True)
     response.append(dial)
 
-    # 2. TRIGGER THE AGENT: Tell Twilio to call the AI Agent
-    # We use your SECOND Twilio number as the 'From' so we know it's the AI
-    client.calls.create(
-        from_=TORONTO_BIZ_NUMBER, 
-        to=AI_AGENT_ID_NUMBER,
-        # IMPORTANT: This URL must be your PUBLIC ngrok URL
-        url="https://unchopped-kristian-unflattened.ngrok-free.dev/agent-join" 
-    )
+    # Trigger AI agent to join conference (only once per server lifetime)
+    global _agent_invited
+    if client and NGROK_BASE_URL and not _agent_invited:
+        _agent_invited = True
+        client.calls.create(
+            from_=TORONTO_BIZ_NUMBER,
+            to=AI_AGENT_ID_NUMBER,
+            url=f"{NGROK_BASE_URL}/agent-join",
+        )
 
     return Response(content=str(response), media_type="application/xml")
 
@@ -107,16 +153,19 @@ async def agent_join_logic():
 @app.post("/broadcast")
 async def handle_webhook(data: TranslationPayload):
     try:
-        # 1. Print to console for immediate debugging
         print(f"--- New Translation Received ---")
         print(f"Caller said: {data.original_text}")
         print(f"AI Translated: {data.translated_text}")
 
-        # 2. Logic to send to React (e.g., via WebSockets or a simple global state)
-        # broadcast_to_frontend(data.translated_text)
+        # Broadcast translation to all connected WS clients
+        await broadcast_all({
+            "type": "translation_update",
+            "original_text": data.original_text,
+            "translated_text": data.translated_text,
+        })
 
-        return {"status": "success" }
-    
+        return {"status": "success"}
+
     except Exception as e:
         print(f"Error processing webhook: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")

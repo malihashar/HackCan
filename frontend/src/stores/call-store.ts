@@ -11,12 +11,19 @@ export type TranscriptMessage = {
   timestamp?: string | null;
 };
 
+export type TranslationEntry = {
+  original_text: string;
+  translated_text: string;
+  timestamp: string;
+};
+
 type CallStore = {
   callState: CallState;
   sessionId: string | null;
   callerNumber: string | null;
   callerLanguage: string | null;
   messages: TranscriptMessage[];
+  translations: TranslationEntry[];
   isConnected: boolean;
 
   setCallState: (state: CallState) => void;
@@ -24,6 +31,7 @@ type CallStore = {
   setCallerNumber: (num: string | null) => void;
   setCallerLanguage: (lang: string | null) => void;
   addMessage: (msg: TranscriptMessage) => void;
+  addTranslation: (entry: TranslationEntry) => void;
   setIsConnected: (connected: boolean) => void;
   resetCall: () => void;
 };
@@ -35,6 +43,7 @@ export const useCallStore = create<CallStore>((set) => ({
   callerNumber: null,
   callerLanguage: null,
   messages: [],
+  translations: [],
   isConnected: false,
 
   setCallState: (callState) => set({ callState }),
@@ -42,6 +51,7 @@ export const useCallStore = create<CallStore>((set) => ({
   setCallerNumber: (callerNumber) => set({ callerNumber }),
   setCallerLanguage: (callerLanguage) => set({ callerLanguage }),
   addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
+  addTranslation: (entry) => set((s) => ({ translations: [...s.translations, entry] })),
   setIsConnected: (isConnected) => set({ isConnected }),
   resetCall: () =>
     set({
@@ -50,5 +60,6 @@ export const useCallStore = create<CallStore>((set) => ({
       callerNumber: null,
       callerLanguage: null,
       messages: [],
+      translations: [],
     }),
 }));

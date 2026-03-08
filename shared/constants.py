@@ -16,6 +16,7 @@ WS_MSG_INCOMING_CALL = "incoming_call"
 WS_MSG_CALL_ACCEPTED = "call_accepted"
 WS_MSG_CALL_DECLINED = "call_declined"
 WS_MSG_CALL_ENDED = "call_ended"
+WS_MSG_TRANSLATION_UPDATE = "translation_update"
 
 # API paths (for reference; actual routes in backend)
 API_PROCESS_AUDIO = "/process-audio"

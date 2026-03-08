@@ -13,6 +13,7 @@ import {
   WS_MSG_CALL_DECLINED,
   WS_MSG_CALL_ENDED,
   WS_MSG_TRANSCRIPT_UPDATE,
+  WS_MSG_TRANSLATION_UPDATE,
 } from "@/services/ws-message-types";
 import { useCallStore } from "@/stores/call-store";
 import type { TranscriptMessage } from "@/stores/call-store";
@@ -23,6 +24,8 @@ type WsMessage = {
   caller_number?: string;
   caller_language?: string;
   message?: TranscriptMessage;
+  original_text?: string;
+  translated_text?: string;
 };
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000/ws";
@@ -39,9 +42,9 @@ export function useCallWebSocket() {
   const mountedRef = useRef(true);
 
   const {
-    callState, sessionId, callerNumber, callerLanguage, messages, isConnected,
+    callState, sessionId, callerNumber, callerLanguage, messages, translations, isConnected,
     setCallState, setSessionId, setCallerNumber, setCallerLanguage,
-    addMessage, setIsConnected, resetCall,
+    addMessage, addTranslation, setIsConnected, resetCall,
   } = useCallStore();
 
   // Keep sessionId in ref so WS handlers always have latest value
@@ -87,8 +90,18 @@ export function useCallWebSocket() {
           addMessage(msg.message);
         }
         break;
+
+      case WS_MSG_TRANSLATION_UPDATE:
+        if (msg.original_text && msg.translated_text) {
+          addTranslation({
+            original_text: msg.original_text,
+            translated_text: msg.translated_text,
+            timestamp: new Date().toISOString(),
+          });
+        }
+        break;
     }
-  }, [setCallState, setSessionId, setCallerNumber, setCallerLanguage, addMessage, resetCall]);
+  }, [setCallState, setSessionId, setCallerNumber, setCallerLanguage, addMessage, addTranslation, resetCall]);
 
   const connect = useCallback(() => {
     if (!mountedRef.current) return;
@@ -204,6 +217,7 @@ export function useCallWebSocket() {
     callerNumber,
     callerLanguage,
     messages,
+    translations,
     isConnected,
     simulateIncomingCall,
     acceptCall,

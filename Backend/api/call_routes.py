@@ -98,4 +98,7 @@ async def end_call(session_id: str):
         "type": WS_MSG_CALL_ENDED,
         "session_id": session_id,
     })
+    # Reset agent invite flag so next call can invite the AI agent again
+    import main as _main_mod
+    _main_mod._agent_invited = False
     return {"session_id": session_id, "status": session.status.value}
