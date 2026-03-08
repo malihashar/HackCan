@@ -51,9 +51,6 @@ app.websocket("/ws")(websocket_endpoint)
 @app.get("/health")
 def health():
     return {"status": "ok"}
-class TranslationPayload(BaseModel):
-    original_text: str
-    translated_text: str
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     response = await call_next(request)
@@ -152,52 +149,78 @@ async def agent_join_logic():
     return Response(content=str(response), media_type="application/xml")
 
 
-@app.post("/disconnect")
+# --- ElevenLabs agent tool endpoints ---
+# These match the tool names in prompt.txt: handle_handoff, handle_disconnect, broadcast_live_transcript
+
+
+class HandoffPayload(BaseModel):
+    detected_language: str = "unknown"
+
+
+@app.post("/handle_handoff")
+async def handle_handoff(data: HandoffPayload):
+    """Called once by AI agent after detecting the caller's language.
+    Notifies frontend of the detected language."""
+    print(f"--- Handoff: language detected = {data.detected_language} ---")
+    await broadcast_all({
+        "type": "language_detected",
+        "detected_language": data.detected_language,
+    })
+    return {"status": "ok"}
+
+@app.post("/handoff")
+async def handoff(data: HandoffPayload):
+    return await handle_handoff(data)
+
+@app.post("/handle_disconnect")
 async def handle_disconnect():
-    """Called by the AI agent when silence detected or party hangs up.
-    Ends the conference by hanging up all participants."""
+    """Called by AI agent on 15s silence or call end.
+    Ends the Twilio conference and notifies frontend."""
     global _agent_invited
     print("--- Disconnect triggered by AI agent ---")
     _agent_invited = False
 
-    # End all active calls in the conference
     if client:
         try:
             conferences = client.conferences.list(
                 friendly_name='LinguisticLifeLine', status='in-progress'
             )
             for conf in conferences:
-                # Update conference to completed, which disconnects all participants
                 client.conferences(conf.sid).update(status='completed')
                 print(f"Conference {conf.sid} ended")
         except Exception as e:
             print(f"Error ending conference: {e}")
 
-    # Broadcast call_ended to frontend via WS
     await broadcast_all({"type": "call_ended"})
-
     return {"status": "disconnected"}
 
 
+@app.post("/disconnect")
+async def disconnect():
+    return await handle_disconnect()
+
+class TranscriptPayload(BaseModel):
+    original_text: str
+    translated_text: str
+
+
+@app.post("/broadcast_live_transcript")
+async def broadcast_live_transcript(data: TranscriptPayload):
+    """Called by AI agent after every translation. Pushes to frontend via WS."""
+    print(f"--- Transcript: {data.original_text} → {data.translated_text} ---")
+    await broadcast_all({
+        "type": "translation_update",
+        "original_text": data.original_text,
+        "translated_text": data.translated_text,
+    })
+    return {"status": "ok"}
+
+
+# Legacy endpoint — kept for backward compatibility
 @app.post("/broadcast")
-async def handle_webhook(data: TranslationPayload):
-    try:
-        print(f"--- New Translation Received ---")
-        print(f"Caller said: {data.original_text}")
-        print(f"AI Translated: {data.translated_text}")
-
-        # Broadcast translation to all connected WS clients
-        await broadcast_all({
-            "type": "translation_update",
-            "original_text": data.original_text,
-            "translated_text": data.translated_text,
-        })
-
-        return {"status": "success"}
-
-    except Exception as e:
-        print(f"Error processing webhook: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+async def handle_webhook(data: TranscriptPayload):
+    """Alias for broadcast_live_transcript."""
+    return await broadcast_live_transcript(data)
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
