@@ -85,6 +85,7 @@ from shared.constants import WS_MSG_INCOMING_CALL
 
 # Track whether AI agent has already been invited to the conference
 _agent_invited = False
+_agent_call_sid = None  # SID of the Twilio call leg for the AI agent
 
 
 @app.get("/token")
@@ -127,15 +128,16 @@ async def handle_incoming_call(request: Request):
     dial.conference('LinguisticLifeLine', start_conference_on_enter=True)
     response.append(dial)
 
-    # Trigger AI agent to join conference (only once per server lifetime)
-    global _agent_invited
+    # Trigger AI agent to join conference (only once)
+    global _agent_invited, _agent_call_sid
     if client and NGROK_BASE_URL and not _agent_invited:
         _agent_invited = True
-        client.calls.create(
+        agent_call = client.calls.create(
             from_=TORONTO_BIZ_NUMBER,
             to=AI_AGENT_ID_NUMBER,
             url=f"{NGROK_BASE_URL}/agent-join",
         )
+        _agent_call_sid = agent_call.sid
 
     return Response(content=str(response), media_type="application/xml")
 
@@ -176,11 +178,21 @@ async def handoff(data: HandoffPayload):
 async def handle_disconnect():
     """Called by AI agent on 15s silence or call end.
     Ends the Twilio conference and notifies frontend."""
-    global _agent_invited
+    global _agent_invited, _agent_call_sid
     print("--- Disconnect triggered by AI agent ---")
     _agent_invited = False
 
     if client:
+        # Kill the AI agent's call leg explicitly
+        if _agent_call_sid:
+            try:
+                client.calls(_agent_call_sid).update(status='completed')
+                print(f"Agent call {_agent_call_sid} killed")
+            except Exception as e:
+                print(f"Error killing agent call: {e}")
+            _agent_call_sid = None
+
+        # End the conference (disconnects all remaining participants)
         try:
             conferences = client.conferences.list(
                 friendly_name='LinguisticLifeLine', status='in-progress'

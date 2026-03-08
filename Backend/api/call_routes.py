@@ -98,7 +98,24 @@ async def end_call(session_id: str):
         "type": WS_MSG_CALL_ENDED,
         "session_id": session_id,
     })
-    # Reset agent invite flag so next call can invite the AI agent again
+    # Kill AI agent call + conference, reset flags
     import main as _main_mod
     _main_mod._agent_invited = False
+    if _main_mod.client:
+        # Kill AI agent's call leg
+        if _main_mod._agent_call_sid:
+            try:
+                _main_mod.client.calls(_main_mod._agent_call_sid).update(status='completed')
+            except Exception:
+                pass
+            _main_mod._agent_call_sid = None
+        # End conference
+        try:
+            conferences = _main_mod.client.conferences.list(
+                friendly_name='LinguisticLifeLine', status='in-progress'
+            )
+            for conf in conferences:
+                _main_mod.client.conferences(conf.sid).update(status='completed')
+        except Exception as e:
+            print(f"Error ending conference on call end: {e}")
     return {"session_id": session_id, "status": session.status.value}
