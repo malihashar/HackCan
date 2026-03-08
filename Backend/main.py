@@ -104,11 +104,28 @@ async def get_twilio_token(identity: str = "agent_browser"):
     return {"token": token.to_jwt()}
 
 
-@app.get("/voice")
+@app.api_route("/voice", methods=["GET", "POST"])
 async def handle_incoming_call(request: Request):
-    caller_number = request.query_params.get("From", "Unknown")
+    # Read params from query (GET) or form body (POST from browser SDK)
+    if request.method == "POST":
+        form = await request.form()
+        caller_number = form.get("From", "Unknown")
+        to_param = form.get("To", "")
+    else:
+        caller_number = request.query_params.get("From", "Unknown")
+        to_param = request.query_params.get("To", "")
 
-    # Create RINGING session and broadcast to frontend
+    print(f"--- /voice hit: method={request.method} From={caller_number} To={to_param} ---")
+
+    # Browser agent joining via device.connect() — just put them in the conference
+    if "conference" in str(to_param).lower() or "client:agent_browser" in str(caller_number).lower():
+        response = VoiceResponse()
+        dial = Dial()
+        dial.conference('LinguisticLifeLine', start_conference_on_enter=True)
+        response.append(dial)
+        return Response(content=str(response), media_type="application/xml")
+
+    # Incoming phone call — create session and notify frontend
     session = create_session(
         status=SessionStatus.RINGING,
         caller_number=caller_number,
@@ -122,7 +139,7 @@ async def handle_incoming_call(request: Request):
         auto_subscribe_session=session.id,
     )
 
-    # Put the human caller into the conference
+    # Put the phone caller into the conference
     response = VoiceResponse()
     dial = Dial()
     dial.conference('LinguisticLifeLine', start_conference_on_enter=True)
@@ -155,24 +172,27 @@ async def agent_join_logic():
 # These match the tool names in prompt.txt: handle_handoff, handle_disconnect, broadcast_live_transcript
 
 
-class HandoffPayload(BaseModel):
-    detected_language: str = "unknown"
-
-
 @app.post("/handle_handoff")
-async def handle_handoff(data: HandoffPayload):
+async def handle_handoff(request: Request):
     """Called once by AI agent after detecting the caller's language.
-    Notifies frontend of the detected language."""
-    print(f"--- Handoff: language detected = {data.detected_language} ---")
+    Accepts any body format — JSON, form, or empty."""
+    detected_language = "unknown"
+    try:
+        body = await request.json()
+        detected_language = body.get("detected_language", body.get("language", "unknown"))
+        print(f"--- Handoff: language={detected_language}, body={body} ---")
+    except Exception:
+        print("--- Handoff: called with no/invalid body ---")
+
     await broadcast_all({
         "type": "language_detected",
-        "detected_language": data.detected_language,
+        "detected_language": detected_language,
     })
     return {"status": "ok"}
 
 @app.post("/handoff")
-async def handoff(data: HandoffPayload):
-    return await handle_handoff(data)
+async def handoff(request: Request):
+    return await handle_handoff(request)
 
 @app.post("/handle_disconnect")
 async def handle_disconnect():
