@@ -34,7 +34,6 @@ python -m venv venv
 # macOS/Linux: source venv/bin/activate
 pip install -r requirements.txt
 ```
-
 Create `Backend/.env` (or project root `.env`):
 
 ```
